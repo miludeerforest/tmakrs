@@ -11,6 +11,15 @@ interface UserPreferences {
   density: 'compact' | 'normal' | 'comfortable'
   tag_layout?: 'grid' | 'masonry'
   sort_by?: 'created' | 'updated' | 'pinned' | 'popular'
+  search_auto_clear_seconds?: number
+  tag_selection_auto_clear_seconds?: number
+  enable_search_auto_clear?: number
+  enable_tag_selection_auto_clear?: number
+  default_bookmark_icon?: string
+  snapshot_retention_count?: number
+  snapshot_auto_create?: number
+  snapshot_auto_dedupe?: number
+  snapshot_auto_cleanup_days?: number
   updated_at: string
 }
 
@@ -21,6 +30,15 @@ interface UpdatePreferencesRequest {
   density?: 'compact' | 'normal' | 'comfortable'
   tag_layout?: 'grid' | 'masonry'
   sort_by?: 'created' | 'updated' | 'pinned' | 'popular'
+  search_auto_clear_seconds?: number
+  tag_selection_auto_clear_seconds?: number
+  enable_search_auto_clear?: boolean
+  enable_tag_selection_auto_clear?: boolean
+  default_bookmark_icon?: string
+  snapshot_retention_count?: number
+  snapshot_auto_create?: boolean
+  snapshot_auto_dedupe?: boolean
+  snapshot_auto_cleanup_days?: number
 }
 
 async function hasTagLayoutColumn(db: D1Database): Promise<boolean> {
@@ -72,6 +90,15 @@ export const onRequestGet: PagesFunction<Env, RouteParams, AuthContext>[] = [
           density: preferences.density,
           tag_layout: preferences.tag_layout ?? 'grid',
           sort_by: preferences.sort_by ?? 'popular',
+          search_auto_clear_seconds: preferences.search_auto_clear_seconds ?? 15,
+          tag_selection_auto_clear_seconds: preferences.tag_selection_auto_clear_seconds ?? 30,
+          enable_search_auto_clear: preferences.enable_search_auto_clear === 1,
+          enable_tag_selection_auto_clear: preferences.enable_tag_selection_auto_clear === 1,
+          default_bookmark_icon: preferences.default_bookmark_icon ?? 'bookmark',
+          snapshot_retention_count: preferences.snapshot_retention_count ?? 5,
+          snapshot_auto_create: preferences.snapshot_auto_create === 1,
+          snapshot_auto_dedupe: preferences.snapshot_auto_dedupe === 1,
+          snapshot_auto_cleanup_days: preferences.snapshot_auto_cleanup_days ?? 0,
           updated_at: preferences.updated_at,
         },
       })
@@ -117,6 +144,26 @@ export const onRequestPatch: PagesFunction<Env, RouteParams, AuthContext>[] = [
         return badRequest('Invalid sort_by value')
       }
 
+      if (body.search_auto_clear_seconds !== undefined && (body.search_auto_clear_seconds < 5 || body.search_auto_clear_seconds > 120)) {
+        return badRequest('Search auto clear seconds must be between 5 and 120')
+      }
+
+      if (body.tag_selection_auto_clear_seconds !== undefined && (body.tag_selection_auto_clear_seconds < 10 || body.tag_selection_auto_clear_seconds > 300)) {
+        return badRequest('Tag selection auto clear seconds must be between 10 and 300')
+      }
+
+      if (body.default_bookmark_icon && !['gradient-glow', 'pulse-breath'].includes(body.default_bookmark_icon)) {
+        return badRequest('Invalid default bookmark icon value')
+      }
+
+      if (body.snapshot_retention_count !== undefined && (body.snapshot_retention_count < -1 || body.snapshot_retention_count > 100)) {
+        return badRequest('Snapshot retention count must be between -1 and 100')
+      }
+
+      if (body.snapshot_auto_cleanup_days !== undefined && (body.snapshot_auto_cleanup_days < 0 || body.snapshot_auto_cleanup_days > 365)) {
+        return badRequest('Snapshot auto cleanup days must be between 0 and 365')
+      }
+
       // 构建更新语句
       const updates: string[] = []
       const values: SQLParam[] = []
@@ -151,6 +198,51 @@ export const onRequestPatch: PagesFunction<Env, RouteParams, AuthContext>[] = [
         values.push(body.sort_by)
       }
 
+      if (body.search_auto_clear_seconds !== undefined) {
+        updates.push('search_auto_clear_seconds = ?')
+        values.push(body.search_auto_clear_seconds)
+      }
+
+      if (body.tag_selection_auto_clear_seconds !== undefined) {
+        updates.push('tag_selection_auto_clear_seconds = ?')
+        values.push(body.tag_selection_auto_clear_seconds)
+      }
+
+      if (body.enable_search_auto_clear !== undefined) {
+        updates.push('enable_search_auto_clear = ?')
+        values.push(body.enable_search_auto_clear ? 1 : 0)
+      }
+
+      if (body.enable_tag_selection_auto_clear !== undefined) {
+        updates.push('enable_tag_selection_auto_clear = ?')
+        values.push(body.enable_tag_selection_auto_clear ? 1 : 0)
+      }
+
+      if (body.default_bookmark_icon !== undefined) {
+        updates.push('default_bookmark_icon = ?')
+        values.push(body.default_bookmark_icon)
+      }
+
+      if (body.snapshot_retention_count !== undefined) {
+        updates.push('snapshot_retention_count = ?')
+        values.push(body.snapshot_retention_count)
+      }
+
+      if (body.snapshot_auto_create !== undefined) {
+        updates.push('snapshot_auto_create = ?')
+        values.push(body.snapshot_auto_create ? 1 : 0)
+      }
+
+      if (body.snapshot_auto_dedupe !== undefined) {
+        updates.push('snapshot_auto_dedupe = ?')
+        values.push(body.snapshot_auto_dedupe ? 1 : 0)
+      }
+
+      if (body.snapshot_auto_cleanup_days !== undefined) {
+        updates.push('snapshot_auto_cleanup_days = ?')
+        values.push(body.snapshot_auto_cleanup_days)
+      }
+
       if (updates.length === 0) {
         if ((body.tag_layout !== undefined && !tagLayoutSupported) ||
             (body.sort_by !== undefined && !sortBySupported)) {
@@ -172,6 +264,15 @@ export const onRequestPatch: PagesFunction<Env, RouteParams, AuthContext>[] = [
               density: preferences.density,
               tag_layout: preferences.tag_layout ?? 'grid',
               sort_by: preferences.sort_by ?? 'popular',
+              search_auto_clear_seconds: preferences.search_auto_clear_seconds ?? 15,
+              tag_selection_auto_clear_seconds: preferences.tag_selection_auto_clear_seconds ?? 30,
+              enable_search_auto_clear: preferences.enable_search_auto_clear === 1,
+              enable_tag_selection_auto_clear: preferences.enable_tag_selection_auto_clear === 1,
+              default_bookmark_icon: preferences.default_bookmark_icon ?? 'bookmark',
+              snapshot_retention_count: preferences.snapshot_retention_count ?? 5,
+              snapshot_auto_create: preferences.snapshot_auto_create === 1,
+              snapshot_auto_dedupe: preferences.snapshot_auto_dedupe === 1,
+              snapshot_auto_cleanup_days: preferences.snapshot_auto_cleanup_days ?? 0,
               updated_at: preferences.updated_at,
             },
           })
@@ -212,6 +313,15 @@ export const onRequestPatch: PagesFunction<Env, RouteParams, AuthContext>[] = [
           density: preferences.density,
           tag_layout: preferences.tag_layout ?? 'grid',
           sort_by: preferences.sort_by ?? 'popular',
+          search_auto_clear_seconds: preferences.search_auto_clear_seconds ?? 15,
+          tag_selection_auto_clear_seconds: preferences.tag_selection_auto_clear_seconds ?? 30,
+          enable_search_auto_clear: preferences.enable_search_auto_clear === 1,
+          enable_tag_selection_auto_clear: preferences.enable_tag_selection_auto_clear === 1,
+          default_bookmark_icon: preferences.default_bookmark_icon ?? 'bookmark',
+          snapshot_retention_count: preferences.snapshot_retention_count ?? 5,
+          snapshot_auto_create: preferences.snapshot_auto_create === 1,
+          snapshot_auto_dedupe: preferences.snapshot_auto_dedupe === 1,
+          snapshot_auto_cleanup_days: preferences.snapshot_auto_cleanup_days ?? 0,
           updated_at: preferences.updated_at,
         },
       })

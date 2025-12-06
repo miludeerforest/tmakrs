@@ -57,7 +57,7 @@ export const bookmarksService = {
   /**
    * 恢复已删除的书签
    */
-  async restoreBookmark(id: number) {
+  async restoreBookmark(id: string) {
     const response = await apiClient.put<{ bookmark: Bookmark }>(`/bookmarks/${id}`)
     return response.data!.bookmark
   },
@@ -76,6 +76,21 @@ export const bookmarksService = {
   async batchAction(data: BatchActionRequest) {
     const response = await apiClient.patch<BatchActionResponse>('/bookmarks/bulk', data)
     return response.data!
+  },
+
+  /**
+   * 获取书签统计数据
+   */
+  async getStatistics(params: {
+    granularity: 'day' | 'week' | 'month' | 'year'
+    startDate: string
+    endDate: string
+  }) {
+    const { granularity, startDate, endDate } = params
+    const response = await apiClient.get(
+      `/bookmarks/statistics?granularity=${granularity}&start_date=${startDate}&end_date=${endDate}`
+    )
+    return response.data
   },
 
   /**
